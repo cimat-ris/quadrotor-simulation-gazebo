@@ -1,3 +1,6 @@
 [submodule "src/mav_comm"]
 	path = src/mav_comm
 	url = https://github.com/ethz-asl/mav_comm
+[submodule "src/rotors_simulator"]
+	path = src/rotors_simulator
+	url = https://github.com/ethz-asl/rotors_simulator
