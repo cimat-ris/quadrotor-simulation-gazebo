@@ -6,7 +6,7 @@ Installation (with [ros-noetic](http://wiki.ros.org/noetic/Installation)):
 
 2. Install osqp:
 ```
-      git clone git@github.com:oxfordcontrol/osqp
+      git clone --recursive git@github.com:oxfordcontrol/osqp
       cd osqp
       mkdir build
       cd build
