@@ -37,4 +37,10 @@ Launch the Gazebo simulation, the quadrotors should be starting in hovering stat
 
 ```
       roslaunch multi_uav_control multiple_hummingbird.launch
-```      
+```
+
+Edit the multi_distributed_control.sh script to use your own path to resources and launch the script:
+```
+      sh multi_distributed_control.sh
+```
+
