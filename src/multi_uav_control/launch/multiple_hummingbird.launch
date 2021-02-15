@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 
 <launch>
-  <arg name="world_name" default="single_obstacle"/>
+  <!-- <arg name="world_name" default="single_obstacle"/> -->
+  <arg name="world_name" default="basic"/> 
   <arg name="enable_logging" default="false"/>
   <arg name="enable_ground_truth" default="true"/>
   <arg name="paused" value="false"/>
@@ -102,6 +103,6 @@
     <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
     <node name="waypoint_publisher" pkg="rotors_gazebo" type="waypoint_publisher" output="screen" args="0 1 1.5 0 8"/>
   </group>
-  
+
 
 </launch>

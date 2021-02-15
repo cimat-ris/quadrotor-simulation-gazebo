@@ -1,5 +1,6 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <boost/bind.hpp>
 #include "../library/MPC.h"
 #include "../library/Consensus.h"
 #include "../library/IOEigen.h"
@@ -30,7 +31,7 @@ void getComputedControls(Eigen::MatrixXd &q);
 bool readMatrix(std::string filename, Eigen::MatrixXd &M);
 
 /*************************** Global variables *************************/
-#define DEBUG 0 
+#define DEBUG 0
 
 int agent = 2;
 
@@ -40,7 +41,7 @@ Eigen::IOFormat OctaveFmt(Eigen::StreamPrecision, 0, ", ", ";\n", "", "", "[", "
 std::string sep = "\n----------------------------------------\n";
 
 // path and gazebo envoronment input names
-std::string path = "/home/cimat/bebop_ws/src/multi_uav_control/resource/";
+std::string path = "resource/";
 std::string A_filename = path+"A.dat";
 std::string d_filename = path+"d.dat";
 std::string simulation_filename = path+"sim.dat";
@@ -52,17 +53,17 @@ std::string obstacle_name = "obstacle";
 std::string relativeEntityName = "world" ;
 
 // output filename
-std::string output_path = "/home/cimat/bebop_ws/src/multi_uav_control/output/data/";
+std::string output_path = "output/data/";
 std::string q_test_filename = output_path+"q_test.dat";//agents position
 std::string q_odom_filename = output_path+"q_odom.dat";
 std::string adjacency_mat_filename = output_path+"adjacency_mat.dat";
 std::string laplacian_mat_filename = output_path+"laplacian_mat.dat";
 std::string q0_mat_filename = output_path+"q0_mat.dat";
 std::string z_mat_filename = output_path+"z_mat.dat";
-std::string q_obst_filename = output_path+"q_obst.dat";// obstacles' position 
-std::string qp_agent_filename = output_path+"qp_agent_"+std::to_string(agent)+".dat";//agents' velocities 
-std::string e_consensus_filename = output_path+"e_consensus.dat";//agents' velocities 
-std::string e_consensus_agents_filename = output_path+"e_consensus_agents.dat";//agents' velocities 
+std::string q_obst_filename = output_path+"q_obst.dat";// obstacles' position
+std::string qp_agent_filename = output_path+"qp_agent_"+std::to_string(agent)+".dat";//agents' velocities
+std::string e_consensus_filename = output_path+"e_consensus.dat";//agents' velocities
+std::string e_consensus_agents_filename = output_path+"e_consensus_agents.dat";//agents' velocities
 std::string qz_agents_filename = output_path+"qz_agents.dat";
 std::string qp_computed_controls_filename = output_path+"qp_computed_controls.dat";
 
@@ -72,7 +73,7 @@ std::string publisher_name = "/command/trajectory";
 std::string subscriber_name = "/ground_truth/position/";
 std::string topic_controls = "/controls/computed_u";
 
-// ros msg's 
+// ros msg's
 std::vector<geometry_msgs::PointStamped> pos_msg;
 std::vector<geometry_msgs::Twist> controls_msg;
 
@@ -83,30 +84,32 @@ int n_robots = 0, dim = 3, n_models = 0, n_obstacles = 0;
 double kf=20;
 
 int main(int argc, char **argv){
+  ros::init(argc,argv,"uav_"+std::to_string(agent)+"_control");
+  ros::NodeHandle nh("~");
+  std::string multi_uav_control_path;
+  nh.getParam("resources_path", multi_uav_control_path);
+  std::cout << multi_uav_control_path << std::endl;
     /************************ Read input paramaters *****************/
     Eigen::MatrixXd A, d_matrix;
-    
-    status_file = readMatrix(A_filename, A);
+
+    status_file = readMatrix(multi_uav_control_path+A_filename, A);
     std::cout<<A<<std::endl;
     if(!status_file){
-        std::cout << "INPUT FILE NOT FOUND! " << std::endl;
+        std::cout << "[ERR] Could not read adjacency matrix file " << std::endl;
+        std::cout << multi_uav_control_path+A_filename << std::endl;
         return 1;
     }
 
-    status_file =  readMatrix(d_filename, d_matrix);
+    status_file =  readMatrix(multi_uav_control_path+d_filename, d_matrix);
     if(!status_file){
-        std::cout << "DISPLACEMENT VECTOR FILE NOT FOUND! " << std::endl;
+        std::cout << "[ERR] Could not read displacements file " << std::endl;
         return 1;
     }
 
     if(A.cols() != d_matrix.cols()){
-        std::cout << "SIZES A & d DONT MATCH! " << std::endl;
+      std::cout << "[ERR] Sizes do not match " << std::endl;
         return 1;
     }
-
-    /***************************** ROS init **************************/
-    ros::init(argc,argv,"uav_"+std::to_string(agent)+"_control");
-    ros::NodeHandle nh;
 
     /************************** Get World Properties ******************/
     /*** Get initial position of robots and obstacles from world properties ***/
@@ -119,7 +122,7 @@ int main(int argc, char **argv){
     gazebo_msgs::GetModelState getModelState;
     geometry_msgs::Point pp;
     ros::ServiceClient gms_c = nh.serviceClient<gazebo_msgs::GetModelState>("/gazebo/get_model_state") ;
-    ros::ServiceClient gwp_c = nh.serviceClient<gazebo_msgs::GetWorldProperties>("gazebo/get_world_properties");
+    ros::ServiceClient gwp_c = nh.serviceClient<gazebo_msgs::GetWorldProperties>("/gazebo/get_world_properties");
     gazebo_msgs::GetWorldProperties gwp_s;
     if (gwp_c.call(gwp_s)){
         std::vector<std::string> models = gwp_s.response.model_names;
@@ -244,7 +247,7 @@ int main(int argc, char **argv){
     double cost_x, cost_u, D, k_d, E, k_e, min_u, max_u, minx, maxx, miny, maxy, minz, maxz;
 
     double tf2=4;
-    Eigen::VectorXd ratios(2); 
+    Eigen::VectorXd ratios(2);
     Eigen::VectorXd system_params;
     readMatrix(simulation_filename, tmp);
     if(tmp.rows() < 3){
@@ -258,27 +261,27 @@ int main(int argc, char **argv){
     readMatrix(MPC_filename, tmp);
     if(tmp.rows() < 17){
         std::cout << "Default system MPC params inicialization" << std::endl;
-        Hp = 15; Hu = 10; Hw = 1; cost_x = 1000.0; cost_u = 1.0; 
-        D = 0.5; k_d = 10.0; E = 2.25; k_e = 1.0; 
-        min_u = -10.0; max_u = 10.0; 
+        Hp = 15; Hu = 10; Hw = 1; cost_x = 1000.0; cost_u = 1.0;
+        D = 0.5; k_d = 10.0; E = 2.25; k_e = 1.0;
+        min_u = -10.0; max_u = 10.0;
         minx = -3.0; maxx = 4.0; miny = -3.0; maxy = 4.0; minz = 0.3; maxz = 2.5;
     }
     else{
-        Hp = int(tmp(0,0)); Hu = int(tmp(1,0)); Hw = int(tmp(2,0)); cost_x = tmp(3,0); cost_u = tmp(4,0); 
-        D = tmp(5,0); k_d = tmp(6,0); E = tmp(7,0); k_e = tmp(8,0); 
-        min_u = tmp(9,0); max_u = tmp(10,0); 
+        Hp = int(tmp(0,0)); Hu = int(tmp(1,0)); Hw = int(tmp(2,0)); cost_x = tmp(3,0); cost_u = tmp(4,0);
+        D = tmp(5,0); k_d = tmp(6,0); E = tmp(7,0); k_e = tmp(8,0);
+        min_u = tmp(9,0); max_u = tmp(10,0);
         minx = tmp(11,0); maxx = tmp(12,0); miny = tmp(13,0); maxy = tmp(14,0); minz = tmp(15,0); maxz = tmp(16,0);
     }
 
     std::cout << "Simulation inicialization" << sep;
 
     steps = tf/dt;
-    
+
 
     /************************ Data storage variables ***********************/
     Eigen::MatrixXd q_odom_data(dim*n_robots, steps+1);
     Eigen::MatrixXd qp_agent_data(dim, steps+1); //Velocities of agent
-    Eigen::MatrixXd qp_computed_controls_data(dim*n_robots, steps+1);  
+    Eigen::MatrixXd qp_computed_controls_data(dim*n_robots, steps+1);
     Eigen::MatrixXd e_consensus_data(dim*n_robots, steps+1);// Consensus of virtual system
  	Eigen::MatrixXd qz_data_agents(dim*n_robots, steps+1);
     /*************************** Start simulation ***********************/
@@ -308,7 +311,7 @@ int main(int argc, char **argv){
         q_odom_data.col(counter) = Consensus::matrix2vector(q_odom);
 		e_consensus_data.col(counter)=e_qz;
 		qz_data_agents.col(counter)=Consensus::matrix2vector(qz);
- 	
+
         if(e_c_L2.maxCoeff()<epsilon)
         {
            ROS_INFO("Consensus reached");
@@ -394,7 +397,7 @@ int main(int argc, char **argv){
         robot_new_pose = q_odom.col(agent) + dt*vel;
 
         //std::cout << robot_new_pose(0) << " " << robot_new_pose(1) << " " << robot_new_pose(2) << sep;
-	
+
         // set MultiDOF msg
         trajectory_msgs::MultiDOFJointTrajectory msg;
         msg.header.stamp=ros::Time::now();
