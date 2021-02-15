@@ -1,6 +1,6 @@
 # quadrotor-simulation-gazebo
 
-Installation (with [ros-noetic](http://wiki.ros.org/noetic/Installation)):
+## Installation (with [ros-noetic](http://wiki.ros.org/noetic/Installation)):
 
 1. Install ROS.
 
@@ -26,3 +26,15 @@ In case you have a problem with the python3 interpreter not found, you can use:
       catkin_make_isolated -DPYTHON_EXECUTABLE="/usr/bin/python3"
 ```
 (or whatever your python3 interpreter is)
+
+## To run
+
+```
+     source devel_isolated/setup.bash
+```   
+
+Launch the Gazebo simulation, the quadrotors should be starting in hovering state:
+
+```
+      roslaunch multi_uav_control multiple_hummingbird.launch
+```      
