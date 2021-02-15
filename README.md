@@ -21,3 +21,8 @@ Installation (with [ros-noetic](http://wiki.ros.org/noetic/Installation)):
 ```
       catkin_make_isolated
 ```
+In case you have a problem with the python3 interpreter not found, you can use:
+```
+      catkin_make_isolated -DPYTHON_EXECUTABLE="/usr/bin/python3"
+```
+(or whatever your python3 interpreter is)
